@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+option go_package = "disysminiproject2/service";
+
+package chittychat;
+
+
+service chittychat {
+    // client gRPC call to make
+    rpc Publish(Message) returns (google.protobuf.Empty) {};
+
+    // server calls this, clients receive on this
+    rpc Broadcast(google.protobuf.Empty) returns (stream Message) {};
+}
+
+
+message Message {
+    uint64 clock = 1;
+    string message = 2;
+}
+
