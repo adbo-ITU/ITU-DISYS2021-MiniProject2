@@ -5,7 +5,6 @@ import (
 	"disysminiproject2/service"
 	"fmt"
 	"log"
-	"os"
 	"strconv"
 	"time"
 
@@ -18,8 +17,7 @@ func main() {
 	fmt.Print("Connecting.. ")
 	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
-		fmt.Printf("There were an error: %v", err)
-		os.Exit(1)
+		log.Fatalf("There were an error: %v", err)
 	}
 	fmt.Println("Done!")
 
