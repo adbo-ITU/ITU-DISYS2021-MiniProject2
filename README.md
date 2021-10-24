@@ -3,5 +3,5 @@
 ## Generate gRPC code
 
 ```sh
-cd service && ./build.sh
+make proto
 ```
