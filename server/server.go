@@ -1,19 +1,32 @@
 package main
 
 import (
-	"context"
 	"disysminiproject2/service"
 	"log"
 
-	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type ChittyChatServer struct {
 	service.UnimplementedChittychatServer
 }
 
-func (ChittyChatServer) Publish(context context.Context, message *service.Message) (*emptypb.Empty, error) {
-	log.Printf("Received message: %s", message.Message)
+func (c *ChittyChatServer) ChatSession(stream service.Chittychat_ChatSessionServer) error {
+	log.Println("New user joined")
 
-	return &emptypb.Empty{}, nil
+	for {
+		msg, err := stream.Recv()
+
+		if e, errOk := status.FromError(err); errOk && err != nil && e.Code() == codes.Canceled {
+			log.Println("User exited")
+			return nil
+		}
+		if err != nil {
+			log.Fatalf("Error on receive: %v", err)
+			return err
+		}
+
+		log.Println(msg.Message)
+	}
 }

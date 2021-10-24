@@ -4,14 +4,12 @@ import (
 	"context"
 	"disysminiproject2/service"
 	"fmt"
+	"log"
 	"os"
+	"strconv"
 	"time"
 
 	"google.golang.org/grpc"
-)
-
-var (
-	clock uint64 = 0
 )
 
 func main() {
@@ -28,13 +26,20 @@ func main() {
 	defer conn.Close()
 	client := service.NewChittychatClient(conn)
 
-	context, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	context := context.Background()
 
 	fmt.Print("Sending message.. ")
-	message := service.Message{Clock: clock, Message: "Hello, World!"}
-	client.Publish(context, &message)
+
+	stream, err := client.ChatSession(context)
+	if err != nil {
+		log.Fatal("Failed to join chat room")
+	}
+
+	for i := 0; i < 10; i++ {
+		message := service.Message{Clock: 0, Message: strconv.Itoa(i)}
+		stream.Send(&message)
+		time.Sleep(1000 * time.Millisecond)
+	}
+
 	fmt.Println("Done!")
-	time.Sleep(5 * time.Second)
-	fmt.Println("Ending now!")
 }
