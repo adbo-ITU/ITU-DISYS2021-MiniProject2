@@ -11,7 +11,7 @@ service chittychat {
 
 
 message Message {
-    uint64 clock = 1;
+    map<string, uint32> clock = 1;
     string content = 2;
 }
 
@@ -21,6 +21,7 @@ message UserMessage {
         DISCONNECT = 1;
         JOIN = 2;
         ERROR = 3;
+        SET_UID = 4;
     }
 
     string user = 1;

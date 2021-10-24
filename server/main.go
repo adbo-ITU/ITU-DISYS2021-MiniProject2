@@ -18,7 +18,9 @@ func main() {
 	server := grpc.NewServer()
 	srv := ChittyChatServer{
 		clients: make(map[string]service.Chittychat_ChatSessionServer),
+		clock:   make(map[string]uint32),
 	}
+	srv.clock["server"] = 0
 	service.RegisterChittychatServer(server, &srv)
 	server.Serve(listener)
 }

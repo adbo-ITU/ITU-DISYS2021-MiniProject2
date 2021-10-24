@@ -6,9 +6,17 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc"
+)
+
+// This is dirty
+var (
+	uid        string
+	clock      service.VectorClock
+	clockMutex sync.Mutex
 )
 
 func main() {
@@ -31,14 +39,27 @@ func main() {
 		log.Fatal("Failed to join chat room")
 	}
 
+	msg, err := stream.Recv()
+	if msg.Event != service.UserMessage_SET_UID || err != nil {
+		log.Fatalf("Failed to get uid: %v", err)
+	}
+	uid = msg.User
+	clock = msg.Message.Clock
+
 	go listenForMessages(stream)
 
 	for i := 0; i < 10; i++ {
-		message := service.Message{Clock: 0, Content: strconv.Itoa(i)}
+		clockMutex.Lock()
+		clock[uid]++
+		clockMutex.Unlock()
+		message := service.Message{Clock: clock, Content: strconv.Itoa(i)}
 		stream.Send(&message)
-		log.Printf("%v You: %s\n", message.Clock, message.Content)
+		log.Printf("%v You (%s): %s\n", service.FormatVectorClockAsString(message.Clock), uid, message.Content)
 		time.Sleep(1000 * time.Millisecond)
 	}
+
+	fmt.Println("Press Enter to exit")
+	fmt.Scanln()
 }
 
 func listenForMessages(stream service.Chittychat_ChatSessionClient) {
@@ -48,15 +69,29 @@ func listenForMessages(stream service.Chittychat_ChatSessionClient) {
 			log.Fatal("Failed to receive message")
 		}
 
+		clockMutex.Lock()
+		clock = service.MergeClocks(clock, msg.Message.Clock)
+		clock[uid]++
+		fmtClock := service.FormatVectorClockAsString(clock)
+		clockMutex.Unlock()
+
 		switch msg.Event {
+		case service.UserMessage_SET_UID:
+			log.Printf("%v set uid to %s\n", fmtClock, msg.User)
+			uid = msg.User
 		case service.UserMessage_MESSAGE:
-			log.Printf("%v %s: %s\n", msg.Message.Clock, msg.User, msg.Message.Content)
+			log.Printf("%v %s: %s\n", fmtClock, msg.User, msg.Message.Content)
 		case service.UserMessage_DISCONNECT:
-			log.Printf("%v %s disconnected\n", msg.Message.Clock, msg.User)
+			log.Printf("%v %s disconnected\n", fmtClock, msg.User)
+			// We don't want to keep dead users around, so we remove it from the
+			// local clock map.
+			clockMutex.Lock()
+			delete(clock, msg.User)
+			clockMutex.Unlock()
 		case service.UserMessage_JOIN:
-			log.Printf("%v %s joined\n", msg.Message.Clock, msg.User)
+			log.Printf("%v %s joined\n", fmtClock, msg.User)
 		case service.UserMessage_ERROR:
-			log.Printf("%v %s crashed\n", msg.Message.Clock, msg.User)
+			log.Printf("%v %s crashed\n", fmtClock, msg.User)
 		}
 	}
 }
