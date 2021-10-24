@@ -6,12 +6,24 @@ package chittychat;
 
 
 service chittychat {
-    rpc ChatSession(stream Message) returns (stream Message) {};
+    rpc ChatSession(stream Message) returns (stream UserMessage) {};
 }
 
 
 message Message {
     uint64 clock = 1;
-    string message = 2;
+    string content = 2;
 }
 
+message UserMessage {
+    enum EventType {
+        MESSAGE = 0;
+        DISCONNECT = 1;
+        JOIN = 2;
+        ERROR = 3;
+    }
+
+    string user = 1;
+    EventType event = 2;
+    Message message = 3;
+}

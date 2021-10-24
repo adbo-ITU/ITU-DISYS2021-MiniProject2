@@ -26,18 +26,37 @@ func main() {
 
 	context := context.Background()
 
-	fmt.Print("Sending message.. ")
-
 	stream, err := client.ChatSession(context)
 	if err != nil {
 		log.Fatal("Failed to join chat room")
 	}
 
+	go listenForMessages(stream)
+
 	for i := 0; i < 10; i++ {
-		message := service.Message{Clock: 0, Message: strconv.Itoa(i)}
+		message := service.Message{Clock: 0, Content: strconv.Itoa(i)}
 		stream.Send(&message)
+		log.Printf("%v You: %s\n", message.Clock, message.Content)
 		time.Sleep(1000 * time.Millisecond)
 	}
+}
 
-	fmt.Println("Done!")
+func listenForMessages(stream service.Chittychat_ChatSessionClient) {
+	for {
+		msg, err := stream.Recv()
+		if err != nil {
+			log.Fatal("Failed to receive message")
+		}
+
+		switch msg.Event {
+		case service.UserMessage_MESSAGE:
+			log.Printf("%v %s: %s\n", msg.Message.Clock, msg.User, msg.Message.Content)
+		case service.UserMessage_DISCONNECT:
+			log.Printf("%v %s disconnected\n", msg.Message.Clock, msg.User)
+		case service.UserMessage_JOIN:
+			log.Printf("%v %s joined\n", msg.Message.Clock, msg.User)
+		case service.UserMessage_ERROR:
+			log.Printf("%v %s crashed\n", msg.Message.Clock, msg.User)
+		}
+	}
 }

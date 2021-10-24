@@ -40,7 +40,7 @@ func (c *chittychatClient) ChatSession(ctx context.Context, opts ...grpc.CallOpt
 
 type Chittychat_ChatSessionClient interface {
 	Send(*Message) error
-	Recv() (*Message, error)
+	Recv() (*UserMessage, error)
 	grpc.ClientStream
 }
 
@@ -52,8 +52,8 @@ func (x *chittychatChatSessionClient) Send(m *Message) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *chittychatChatSessionClient) Recv() (*Message, error) {
-	m := new(Message)
+func (x *chittychatChatSessionClient) Recv() (*UserMessage, error) {
+	m := new(UserMessage)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func _Chittychat_ChatSession_Handler(srv interface{}, stream grpc.ServerStream) 
 }
 
 type Chittychat_ChatSessionServer interface {
-	Send(*Message) error
+	Send(*UserMessage) error
 	Recv() (*Message, error)
 	grpc.ServerStream
 }
@@ -102,7 +102,7 @@ type chittychatChatSessionServer struct {
 	grpc.ServerStream
 }
 
-func (x *chittychatChatSessionServer) Send(m *Message) error {
+func (x *chittychatChatSessionServer) Send(m *UserMessage) error {
 	return x.ServerStream.SendMsg(m)
 }
 

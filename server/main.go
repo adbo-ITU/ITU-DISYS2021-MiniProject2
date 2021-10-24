@@ -14,7 +14,7 @@ func main() {
 		log.Fatalf("Error while attempting to listen on port 3333: %v", err)
 	}
 
-	log.Println("Starting server")
+	log.Println("Started server")
 	server := grpc.NewServer()
 	srv := ChittyChatServer{
 		clients: make(map[string]service.Chittychat_ChatSessionServer),
