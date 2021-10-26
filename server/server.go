@@ -105,11 +105,9 @@ func (c *ChittyChatServer) ChatSession(stream service.Chittychat_ChatSessionServ
 
 func (c *ChittyChatServer) broadcastMessage(content string, uid string, event service.UserMessage_EventType) {
 	c.incrementOwnClock()
-	for k, v := range c.getAllClients() {
-		if k != uid {
-			message := service.UserMessage{Message: c.newMessage(content), User: uid, Event: event}
-			v.Send(&message)
-		}
+	for _, v := range c.getAllClients() {
+		message := service.UserMessage{Message: c.newMessage(content), User: uid, Event: event}
+		v.Send(&message)
 	}
 }
 

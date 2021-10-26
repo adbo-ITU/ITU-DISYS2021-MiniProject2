@@ -1,14 +1,13 @@
 package main
 
 import (
-	"context"
 	"disysminiproject2/service"
 	"fmt"
 	"log"
-	"strconv"
+	"os"
 	"sync"
-	"time"
 
+	ui "github.com/gizak/termui/v3"
 	"google.golang.org/grpc"
 )
 
@@ -20,6 +19,16 @@ var (
 )
 
 func main() {
+
+	f, err := os.OpenFile("other.log", os.O_RDWR|os.O_CREATE, 0666)
+	if err != nil {
+		log.Fatalf("error opening file: %v", err)
+	}
+	defer f.Close()
+
+	log.SetOutput(f)
+
+	log.Println("Starting the system")
 	address := "127.0.0.1:3333"
 
 	fmt.Print("Connecting.. ")
@@ -28,70 +37,25 @@ func main() {
 		log.Fatalf("There were an error: %v", err)
 	}
 	fmt.Println("Done!")
-
 	defer conn.Close()
-	client := service.NewChittychatClient(conn)
 
-	context := context.Background()
-
-	stream, err := client.ChatSession(context)
-	if err != nil {
-		log.Fatal("Failed to join chat room")
+	// Create the UI
+	if err := ui.Init(); err != nil {
+		log.Fatalf("failed to initialize termui: %v", err)
 	}
+	defer ui.Close()
 
-	msg, err := stream.Recv()
-	if msg.Event != service.UserMessage_SET_UID || err != nil {
-		log.Fatalf("Failed to get uid: %v", err)
-	}
-	uid = msg.User
-	clock = msg.Message.Clock
+	// going to listen to this channel later to stop main thread from exiting
+	systemExitChannel := make(chan (bool))
 
-	go listenForMessages(stream)
+	theUI := NewUI()
+	StartClient(conn, theUI.messageStream, theUI.chatEvents)
+	theUI.uiEvents = ui.PollEvents()
+	theUI.Render()
 
-	for i := 0; i < 10; i++ {
-		clockMutex.Lock()
-		clock[uid]++
-		clockMutex.Unlock()
-		message := service.Message{Clock: clock, Content: strconv.Itoa(i)}
-		stream.Send(&message)
-		log.Printf("%v You (%s): %s\n", service.FormatVectorClockAsString(message.Clock), uid, message.Content)
-		time.Sleep(1000 * time.Millisecond)
-	}
+	go theUI.HandleUIEvents(systemExitChannel)
+	go theUI.HandleChatMessages()
 
-	fmt.Println("Press Enter to exit")
-	fmt.Scanln()
-}
-
-func listenForMessages(stream service.Chittychat_ChatSessionClient) {
-	for {
-		msg, err := stream.Recv()
-		if err != nil {
-			log.Fatal("Failed to receive message")
-		}
-
-		clockMutex.Lock()
-		clock = service.MergeClocks(clock, msg.Message.Clock)
-		clock[uid]++
-		fmtClock := service.FormatVectorClockAsString(clock)
-		clockMutex.Unlock()
-
-		switch msg.Event {
-		case service.UserMessage_SET_UID:
-			log.Printf("%v set uid to %s\n", fmtClock, msg.User)
-			uid = msg.User
-		case service.UserMessage_MESSAGE:
-			log.Printf("%v %s: %s\n", fmtClock, msg.User, msg.Message.Content)
-		case service.UserMessage_DISCONNECT:
-			log.Printf("%v %s disconnected\n", fmtClock, msg.User)
-			// We don't want to keep dead users around, so we remove it from the
-			// local clock map.
-			clockMutex.Lock()
-			delete(clock, msg.User)
-			clockMutex.Unlock()
-		case service.UserMessage_JOIN:
-			log.Printf("%v %s joined\n", fmtClock, msg.User)
-		case service.UserMessage_ERROR:
-			log.Printf("%v %s crashed\n", fmtClock, msg.User)
-		}
-	}
+	// Prevent program exit before something is sent on this
+	<-systemExitChannel
 }
