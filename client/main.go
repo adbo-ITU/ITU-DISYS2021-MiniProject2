@@ -15,6 +15,7 @@ import (
 // This is dirty
 var (
 	uid        string
+	username   string
 	clock      service.VectorClock
 	clockMutex sync.Mutex
 )
@@ -40,11 +41,33 @@ func main() {
 	}
 
 	msg, err := stream.Recv()
+
+	uid = msg.User
+	clock = msg.Message.Clock
+
+	clockMutex.Lock()
+	clock[uid]++
+	clockMutex.Unlock()
+
 	if msg.Event != service.UserMessage_SET_UID || err != nil {
 		log.Fatalf("Failed to get uid: %v", err)
 	}
-	uid = msg.User
-	clock = msg.Message.Clock
+
+	msg, err = stream.Recv()
+	if msg.Event != service.UserMessage_SET_USERNAME || err != nil {
+		log.Fatalf("Failed to get usernamerequest: %v", err)
+	}
+
+	clockMutex.Lock()
+	clock[uid]++
+	fmtClock := service.FormatVectorClockAsString(clock)
+	clockMutex.Unlock()
+
+	log.Printf("%v please enter wanted username\n", fmtClock)
+	fmt.Scan(&username)
+
+	message := service.Message{Clock: clock, Content: username}
+	stream.Send(&message)
 
 	go listenForMessages(stream)
 
@@ -79,6 +102,8 @@ func listenForMessages(stream service.Chittychat_ChatSessionClient) {
 		case service.UserMessage_SET_UID:
 			log.Printf("%v set uid to %s\n", fmtClock, msg.User)
 			uid = msg.User
+		case service.UserMessage_INVALID_USERNAME:
+			log.Printf("%v Usernmae %s already taken. Please rejoin with new name\n", fmtClock, username)
 		case service.UserMessage_MESSAGE:
 			log.Printf("%v %s: %s\n", fmtClock, msg.User, msg.Message.Content)
 		case service.UserMessage_DISCONNECT:

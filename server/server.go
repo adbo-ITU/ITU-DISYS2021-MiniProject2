@@ -14,9 +14,10 @@ import (
 type ChittyChatServer struct {
 	service.UnimplementedChittychatServer
 
-	clients map[string]service.Chittychat_ChatSessionServer
-	mutex   sync.Mutex
-	clock   service.VectorClock
+	clients   map[string]service.Chittychat_ChatSessionServer
+	usernames map[string]string
+	mutex     sync.Mutex
+	clock     service.VectorClock
 }
 
 func (c *ChittyChatServer) addClient(id string, conn service.Chittychat_ChatSessionServer) error {
@@ -26,8 +27,41 @@ func (c *ChittyChatServer) addClient(id string, conn service.Chittychat_ChatSess
 	if _, ok := c.clients[id]; ok {
 		return fmt.Errorf("user id already exists: %s", id)
 	}
+
 	c.clients[id] = conn
 	c.clock[id] = 0
+
+	return nil
+}
+
+func (c *ChittyChatServer) addUsername(uid string, conn service.Chittychat_ChatSessionServer) error {
+
+	message := service.UserMessage{Message: c.newMessage(""), User: c.usernames[uid], Event: service.UserMessage_SET_USERNAME}
+	conn.Send(&message)
+
+	msg, err := conn.Recv()
+
+	if e, errOk := status.FromError(err); errOk && err != nil && e.Code() == codes.Canceled {
+		log.Printf("[%v] User exited\n", uid)
+		c.broadcastMessage("", uid, service.UserMessage_DISCONNECT)
+		return nil
+	}
+	if err != nil {
+		log.Printf("[%v] Error on receive: %v\n", uid, err)
+		c.broadcastMessage("", uid, service.UserMessage_ERROR)
+		return err
+	}
+
+	username := msg.Content
+
+	if containsUsername(username, c.usernames) {
+		fmt.Printf("U: %s", username)
+		message := service.UserMessage{Message: c.newMessage(""), User: c.usernames[uid], Event: service.UserMessage_INVALID_USERNAME}
+		conn.Send(&message)
+		return fmt.Errorf("username already exists: %s", username)
+	}
+
+	c.usernames[uid] = username
 	return nil
 }
 
@@ -59,7 +93,18 @@ func (c *ChittyChatServer) getAllClients() map[string]service.Chittychat_ChatSes
 	return clone
 }
 
+func containsUsername(username string, usernames map[string]string) bool {
+
+	for _, v := range usernames {
+		if v == username {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *ChittyChatServer) ChatSession(stream service.Chittychat_ChatSessionServer) error {
+
 	log.Println("New user joined")
 	uid := uuid.Must(uuid.NewRandom()).String()[0:4]
 
@@ -67,6 +112,7 @@ func (c *ChittyChatServer) ChatSession(stream service.Chittychat_ChatSessionServ
 	err := c.addClient(uid, stream)
 	if err != nil {
 		log.Printf("Client join error: %v\n", err)
+		return err
 	}
 	defer c.removeClient(uid)
 
@@ -74,6 +120,12 @@ func (c *ChittyChatServer) ChatSession(stream service.Chittychat_ChatSessionServ
 	err = stream.Send(&service.UserMessage{Message: c.newMessage(""), User: uid, Event: service.UserMessage_SET_UID})
 	if err != nil {
 		log.Printf("Failed to send back UID: %v\n", err)
+		return err
+	}
+
+	err = c.addUsername(uid, stream)
+	if err != nil {
+		return err
 	}
 
 	c.broadcastMessage("", uid, service.UserMessage_JOIN)
@@ -98,7 +150,7 @@ func (c *ChittyChatServer) ChatSession(stream service.Chittychat_ChatSessionServ
 		c.incrementOwnClock()
 
 		fmtClock := service.FormatVectorClockAsString(c.clock)
-		log.Printf("[%v] %s %s", uid, fmtClock, msg.Content)
+		log.Printf("[%v] %s %s", c.usernames[uid], fmtClock, msg.Content)
 		c.broadcastMessage(msg.Content, uid, service.UserMessage_MESSAGE)
 	}
 }
@@ -107,7 +159,7 @@ func (c *ChittyChatServer) broadcastMessage(content string, uid string, event se
 	c.incrementOwnClock()
 	for k, v := range c.getAllClients() {
 		if k != uid {
-			message := service.UserMessage{Message: c.newMessage(content), User: uid, Event: event}
+			message := service.UserMessage{Message: c.newMessage(content), User: c.usernames[uid], Event: event}
 			v.Send(&message)
 		}
 	}
@@ -115,6 +167,7 @@ func (c *ChittyChatServer) broadcastMessage(content string, uid string, event se
 
 func (c *ChittyChatServer) newMessage(content string) *service.Message {
 	return &service.Message{Clock: c.clock, Content: content}
+
 }
 
 func (c *ChittyChatServer) incrementOwnClock() {

@@ -22,6 +22,8 @@ message UserMessage {
         JOIN = 2;
         ERROR = 3;
         SET_UID = 4;
+        SET_USERNAME =5;
+        INVALID_USERNAME = 6;
     }
 
     string user = 1;
