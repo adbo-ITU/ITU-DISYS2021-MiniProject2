@@ -9,7 +9,7 @@ package chittychat;
 service chittychat {
     rpc ChatSession(stream Message) returns (stream UserMessage) {};
 
-    rpc Publish(stream Message) returns (google.protobuf.Empty) {};
+    rpc Publish(stream UserMessage) returns (google.protobuf.Empty) {};
     rpc Broadcast(google.protobuf.Empty) returns (stream UserMessage) {};
 }
 

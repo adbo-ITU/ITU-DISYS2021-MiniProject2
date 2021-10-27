@@ -4,10 +4,10 @@ package service
 
 import (
 	context "context"
+	empty "github.com/golang/protobuf/ptypes/empty"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -21,7 +21,7 @@ const _ = grpc.SupportPackageIsVersion7
 type ChittychatClient interface {
 	ChatSession(ctx context.Context, opts ...grpc.CallOption) (Chittychat_ChatSessionClient, error)
 	Publish(ctx context.Context, opts ...grpc.CallOption) (Chittychat_PublishClient, error)
-	Broadcast(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (Chittychat_BroadcastClient, error)
+	Broadcast(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (Chittychat_BroadcastClient, error)
 }
 
 type chittychatClient struct {
@@ -73,8 +73,8 @@ func (c *chittychatClient) Publish(ctx context.Context, opts ...grpc.CallOption)
 }
 
 type Chittychat_PublishClient interface {
-	Send(*Message) error
-	CloseAndRecv() (*emptypb.Empty, error)
+	Send(*UserMessage) error
+	CloseAndRecv() (*empty.Empty, error)
 	grpc.ClientStream
 }
 
@@ -82,22 +82,22 @@ type chittychatPublishClient struct {
 	grpc.ClientStream
 }
 
-func (x *chittychatPublishClient) Send(m *Message) error {
+func (x *chittychatPublishClient) Send(m *UserMessage) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *chittychatPublishClient) CloseAndRecv() (*emptypb.Empty, error) {
+func (x *chittychatPublishClient) CloseAndRecv() (*empty.Empty, error) {
 	if err := x.ClientStream.CloseSend(); err != nil {
 		return nil, err
 	}
-	m := new(emptypb.Empty)
+	m := new(empty.Empty)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func (c *chittychatClient) Broadcast(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (Chittychat_BroadcastClient, error) {
+func (c *chittychatClient) Broadcast(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (Chittychat_BroadcastClient, error) {
 	stream, err := c.cc.NewStream(ctx, &Chittychat_ServiceDesc.Streams[2], "/chittychat.chittychat/Broadcast", opts...)
 	if err != nil {
 		return nil, err
@@ -135,7 +135,7 @@ func (x *chittychatBroadcastClient) Recv() (*UserMessage, error) {
 type ChittychatServer interface {
 	ChatSession(Chittychat_ChatSessionServer) error
 	Publish(Chittychat_PublishServer) error
-	Broadcast(*emptypb.Empty, Chittychat_BroadcastServer) error
+	Broadcast(*empty.Empty, Chittychat_BroadcastServer) error
 	mustEmbedUnimplementedChittychatServer()
 }
 
@@ -149,7 +149,7 @@ func (UnimplementedChittychatServer) ChatSession(Chittychat_ChatSessionServer) e
 func (UnimplementedChittychatServer) Publish(Chittychat_PublishServer) error {
 	return status.Errorf(codes.Unimplemented, "method Publish not implemented")
 }
-func (UnimplementedChittychatServer) Broadcast(*emptypb.Empty, Chittychat_BroadcastServer) error {
+func (UnimplementedChittychatServer) Broadcast(*empty.Empty, Chittychat_BroadcastServer) error {
 	return status.Errorf(codes.Unimplemented, "method Broadcast not implemented")
 }
 func (UnimplementedChittychatServer) mustEmbedUnimplementedChittychatServer() {}
@@ -196,8 +196,8 @@ func _Chittychat_Publish_Handler(srv interface{}, stream grpc.ServerStream) erro
 }
 
 type Chittychat_PublishServer interface {
-	SendAndClose(*emptypb.Empty) error
-	Recv() (*Message, error)
+	SendAndClose(*empty.Empty) error
+	Recv() (*UserMessage, error)
 	grpc.ServerStream
 }
 
@@ -205,12 +205,12 @@ type chittychatPublishServer struct {
 	grpc.ServerStream
 }
 
-func (x *chittychatPublishServer) SendAndClose(m *emptypb.Empty) error {
+func (x *chittychatPublishServer) SendAndClose(m *empty.Empty) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *chittychatPublishServer) Recv() (*Message, error) {
-	m := new(Message)
+func (x *chittychatPublishServer) Recv() (*UserMessage, error) {
+	m := new(UserMessage)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -218,7 +218,7 @@ func (x *chittychatPublishServer) Recv() (*Message, error) {
 }
 
 func _Chittychat_Broadcast_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(emptypb.Empty)
+	m := new(empty.Empty)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
