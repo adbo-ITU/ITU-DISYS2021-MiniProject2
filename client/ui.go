@@ -26,8 +26,11 @@ func (u *UserUI) HandleChatMessages() {
 	for {
 		msg := <-u.chatEvents
 		formattedMsg := FormatMessageContent(msg)
-		u.chatPane.Rows = append(u.chatPane.Rows, formattedMsg)
-		u.chatPane.ScrollDown()
+		lines := strings.Split(formattedMsg, "\n")
+		for _, line := range lines {
+			u.chatPane.Rows = append(u.chatPane.Rows, line)
+			u.chatPane.ScrollDown()
+		}
 		log.Println(formattedMsg)
 		u.Render()
 	}
