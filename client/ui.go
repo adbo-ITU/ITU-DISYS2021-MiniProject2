@@ -26,11 +26,13 @@ func (u *UserUI) HandleChatMessages() {
 	for {
 		msg := <-u.chatEvents
 		formattedMsg := FormatMessageContent(msg)
-		lines := strings.Split(formattedMsg, "\n")
+		lines := u.manuallyWrapLines(formattedMsg)
 		for _, line := range lines {
 			u.chatPane.Rows = append(u.chatPane.Rows, line)
 			u.chatPane.ScrollDown()
 		}
+		u.chatPane.Rows = append(u.chatPane.Rows, "")
+		u.chatPane.ScrollDown()
 		log.Println(formattedMsg)
 		u.Render()
 	}
@@ -88,14 +90,13 @@ func (u *UserUI) Render() {
 
 	// Here we manually do text wrapping on the input to fit it in the text box.
 	// We also only show the last N lines that can fit in the text box.
-	chatInputSize := u.chatInput.Inner.Size()
-	maxLengthForInput, maxHeightForInput := chatInputSize.X, chatInputSize.Y
-	inputLines := bigChungus([]rune(u.userInput), maxLengthForInput)
-	inputLinesStrs := make([]string, maxHeightForInput)
-	for i := 0; i < maxHeightForInput && i < len(inputLines); i++ {
-		inputLinesStrs[maxHeightForInput-i-1] = string(inputLines[len(inputLines)-i-1])
+	inputLines := u.manuallyWrapLines(u.userInput)
+	maxHeightForInput := u.chatInput.Inner.Size().Y
+	if len(inputLines) > maxHeightForInput {
+		inputLines = inputLines[len(inputLines)-maxHeightForInput:]
 	}
-	u.chatInput.Text = strings.Join(inputLinesStrs, "\n")
+
+	u.chatInput.Text = strings.Join(inputLines, "\n")
 
 	ui.Render(u.grid)
 }
@@ -125,6 +126,19 @@ func NewUI() UserUI {
 	return UserUI{grid: grid, chatInput: chatInput, chatPane: chatPane, chatEvents: messagesChannel, messageStream: messageStream}
 }
 
+func (u *UserUI) manuallyWrapLines(text string) []string {
+	maxLengthForInput := u.chatInput.Inner.Size().X
+	lines := strings.Split(text, "\n")
+	outLines := make([]string, 0)
+	for _, line := range lines {
+		subLines := bigChungus([]rune(line), maxLengthForInput)
+		for i := 0; i < len(subLines); i++ {
+			outLines = append(outLines, string(subLines[i]))
+		}
+	}
+	return outLines
+}
+
 // Thank you, https://freshman.tech/snippets/go/split-slice-into-chunks/
 // Splits a slice into uniformly sized chunks
 func bigChungus(slice []rune, chunkSize int) [][]rune {
@@ -138,7 +152,6 @@ func bigChungus(slice []rune, chunkSize int) [][]rune {
 
 		chunks = append(chunks, slice[i:end])
 	}
-
 	return chunks
 }
 
