@@ -15,21 +15,116 @@ import (
 type ChittyChatServer struct {
 	service.UnimplementedChittychatServer
 
-	clients map[string]service.Chittychat_ChatSessionServer
+	clients map[string]service.Chittychat_BroadcastServer
 	mutex   sync.Mutex
 	clock   service.VectorClock
+
+	incomingMessages     chan *service.UserMessage
+	manyIncomingMessages map[string]chan *service.UserMessage
+}
+
+func NewServer() ChittyChatServer {
+	return ChittyChatServer{
+		clients:              make(map[string]service.Chittychat_BroadcastServer),
+		clock:                make(map[string]uint32),
+		incomingMessages:     make(chan *service.UserMessage, 1000),
+		manyIncomingMessages: make(map[string](chan *service.UserMessage)),
+	}
 }
 
 func (c *ChittyChatServer) Publish(stream service.Chittychat_PublishServer) error {
-	// Communication: messages coming from the clients to the sever
-	// TODO: process messages from the client and get them over to broadcast
+	// RECEIVE MESSAGES AND PASS TO BROADCAST
+
+	// This is to prevent segmentation violations on user exit, as the msg received will be nil
+	var cachedUID string
+
+	for {
+		msg, err := stream.Recv()
+		log.Println("Recevied published message from client")
+
+		// Store the uid of the publishing user
+		if msg != nil {
+			cachedUID = msg.User
+		}
+
+		if e, errOk := status.FromError(err); errOk && err != nil && e.Code() == codes.Canceled {
+			log.Printf("[%v] User exited\n", cachedUID)
+			c.broadcastServiceMessage("", cachedUID, service.UserMessage_DISCONNECT)
+			return nil
+		}
+		if err != nil {
+			log.Printf("[%v] Error on receive: %v\n", msg.User, err)
+			c.broadcastServiceMessage("", msg.User, service.UserMessage_ERROR)
+			return err
+		}
+
+		c.mutex.Lock()
+		c.clock = service.MergeClocks(c.clock, msg.Message.Clock)
+		c.mutex.Unlock()
+		c.incrementOwnClock()
+
+		fmtClock := service.FormatVectorClockAsString(c.clock)
+		log.Printf("[%v] %s %s", msg.User, fmtClock, msg.Message)
+
+		// Throw the message into the incoming messages channel
+		// c.incomingMessages <- msg
+		for _, channel := range c.manyIncomingMessages {
+			channel <- msg
+		}
+	}
 
 	return status.Errorf(codes.Unimplemented, "method Publish not implemented")
 }
 
+func provisionClient(stream service.Chittychat_BroadcastServer, server *ChittyChatServer, uid string) error {
+	return stream.Send(&service.UserMessage{Message: server.newMessage(""), User: uid, Event: service.UserMessage_SET_UID})
+}
+
 func (c *ChittyChatServer) Broadcast(_ *emptypb.Empty, stream service.Chittychat_BroadcastServer) error {
-	// Communication: messages clients needs to go to all clients
-	// TODO: send all messages coming in from publish to all messages
+	// Each broadcast call will live in its own goroutine - serving one client each
+	// https://github.com/grpc/grpc-go/blob/master/Documentation/concurrency.md#servers
+
+	// Communication: messages clients needs to go to all clientss
+
+	log.Println("New user joined")
+	uid := uuid.Must(uuid.NewRandom()).String()[0:4]
+
+	// Create the communications channel to receive incoming messages destined for the belonging client
+	c.manyIncomingMessages[uid] = make(chan *service.UserMessage, 20)
+
+	c.incrementOwnClock()
+	err := c.addClient(uid, stream)
+	if err != nil {
+		log.Printf("Client join error: %v\n", err)
+	}
+	defer c.removeClient(uid)
+
+	c.incrementOwnClock()
+
+	// provision the client means to set the client up with the correct configuration: setting its id
+	err = provisionClient(stream, c, uid)
+	if err != nil {
+		log.Printf("Failed to send back UID: %v\n", err)
+	}
+
+	c.broadcastServiceMessage("", uid, service.UserMessage_JOIN)
+
+	for {
+		msg := <-c.manyIncomingMessages[uid]
+
+		c.mutex.Lock()
+		c.clock = service.MergeClocks(c.clock, msg.Message.Clock)
+		c.mutex.Unlock()
+		c.incrementOwnClock()
+
+		fmtClock := service.FormatVectorClockAsString(c.clock)
+		log.Printf("[%v] %s %s", msg.User, fmtClock, msg.Message.Content)
+		// c.broadcastMessage(msg.Message.Content, msg.User, service.UserMessage_MESSAGE)
+
+		// we're creating a message and making sure we're sending the information about which user it is coming from
+		message := service.UserMessage{Message: c.newMessage(msg.Message.Content), User: msg.User, Event: service.UserMessage_MESSAGE}
+		c.clients[uid].Send(&message)
+	}
 
 	return status.Errorf(codes.Unimplemented, "method Broadcast not implemented")
 }
@@ -51,19 +146,19 @@ func (c *ChittyChatServer) ChatSession(stream service.Chittychat_ChatSessionServ
 		log.Printf("Failed to send back UID: %v\n", err)
 	}
 
-	c.broadcastMessage("", uid, service.UserMessage_JOIN)
+	c.broadcastServiceMessage("", uid, service.UserMessage_JOIN)
 
 	for {
 		msg, err := stream.Recv()
 
 		if e, errOk := status.FromError(err); errOk && err != nil && e.Code() == codes.Canceled {
 			log.Printf("[%v] User exited\n", uid)
-			c.broadcastMessage("", uid, service.UserMessage_DISCONNECT)
+			c.broadcastServiceMessage("", uid, service.UserMessage_DISCONNECT)
 			return nil
 		}
 		if err != nil {
 			log.Printf("[%v] Error on receive: %v\n", uid, err)
-			c.broadcastMessage("", uid, service.UserMessage_ERROR)
+			c.broadcastServiceMessage("", uid, service.UserMessage_ERROR)
 			return err
 		}
 
@@ -74,21 +169,21 @@ func (c *ChittyChatServer) ChatSession(stream service.Chittychat_ChatSessionServ
 
 		fmtClock := service.FormatVectorClockAsString(c.clock)
 		log.Printf("[%v] %s %s", uid, fmtClock, msg.Content)
-		c.broadcastMessage(msg.Content, uid, service.UserMessage_MESSAGE)
+		c.broadcastServiceMessage(msg.Content, uid, service.UserMessage_MESSAGE)
 	}
 }
 
-func (c *ChittyChatServer) getAllClients() map[string]service.Chittychat_ChatSessionServer {
+func (c *ChittyChatServer) getAllClients() map[string]service.Chittychat_BroadcastServer {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	clone := make(map[string]service.Chittychat_ChatSessionServer)
+	clone := make(map[string]service.Chittychat_BroadcastServer)
 	for k, v := range c.clients {
 		clone[k] = v
 	}
 	return clone
 }
 
-func (c *ChittyChatServer) addClient(id string, conn service.Chittychat_ChatSessionServer) error {
+func (c *ChittyChatServer) addClient(id string, conn service.Chittychat_BroadcastServer) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -107,7 +202,7 @@ func (c *ChittyChatServer) removeClient(id string) {
 	delete(c.clock, id)
 }
 
-func (c *ChittyChatServer) broadcastMessage(content string, uid string, event service.UserMessage_EventType) {
+func (c *ChittyChatServer) broadcastServiceMessage(content string, uid string, event service.UserMessage_EventType) {
 	c.incrementOwnClock()
 	for _, v := range c.getAllClients() {
 		message := service.UserMessage{Message: c.newMessage(content), User: uid, Event: event}
