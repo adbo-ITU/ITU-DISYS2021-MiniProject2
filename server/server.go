@@ -12,6 +12,14 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
+// Rewrite to publish/broadcast TODO:
+/*
+	* Rewrite to publish/broadcast TODO:
+		- broadcastServiceMessage should perhaps also use new broadcast call, such that messages
+		  are not sent to all clients, but are put into the channels for broadcasting to all
+		- Look into the formatting of user messages, it looks weird
+*/
+
 type ChittyChatServer struct {
 	service.UnimplementedChittychatServer
 
@@ -123,10 +131,16 @@ func (c *ChittyChatServer) Broadcast(_ *emptypb.Empty, stream service.Chittychat
 
 		// we're creating a message and making sure we're sending the information about which user it is coming from
 		message := service.UserMessage{Message: c.newMessage(msg.Message.Content), User: msg.User, Event: service.UserMessage_MESSAGE}
-		c.clients[uid].Send(&message)
+		err = c.clients[uid].Send(&message)
+
+		if err != nil {
+			// lets just do this so that so the go linter thinks we can reach end of this function
+			break
+		}
 	}
 
-	return status.Errorf(codes.Unimplemented, "method Broadcast not implemented")
+	// return status.Errorf(codes.Unimplemented, "method Broadcast not implemented")
+	return nil
 }
 
 func (c *ChittyChatServer) ChatSession(stream service.Chittychat_ChatSessionServer) error {
