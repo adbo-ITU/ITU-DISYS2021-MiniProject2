@@ -4,6 +4,7 @@ import (
 	"disysminiproject2/service"
 	"log"
 	"strings"
+	"sync"
 
 	ui "github.com/gizak/termui/v3"
 	"github.com/gizak/termui/v3/widgets"
@@ -17,6 +18,7 @@ type UserUI struct {
 	uiEvents      <-chan ui.Event
 	chatEvents    chan *service.UserMessage
 	messageStream chan string
+	renderArbiter sync.Mutex
 }
 
 func (u *UserUI) HandleChatMessages() {
@@ -25,6 +27,7 @@ func (u *UserUI) HandleChatMessages() {
 		msg := <-u.chatEvents
 		formattedMsg := FormatMessageContent(msg)
 		u.chatPane.Rows = append(u.chatPane.Rows, formattedMsg)
+		u.chatPane.ScrollDown()
 		log.Println(formattedMsg)
 		u.Render()
 	}
@@ -47,6 +50,10 @@ func (u *UserUI) HandleUIEvents(systemExitChan chan<- bool) {
 				// send buffered message
 				u.messageStream <- buffer
 			}
+		case "<Up>":
+			u.handleScrollUp()
+		case "<Down>":
+			u.handleScrollDown()
 		case "<Escape>", "<C-c>":
 			log.Println("Received UI event for program exit")
 			systemExitChan <- true
@@ -70,6 +77,9 @@ func (u *UserUI) HandleUIEvents(systemExitChan chan<- bool) {
 }
 
 func (u *UserUI) Render() {
+	u.renderArbiter.Lock()
+	defer u.renderArbiter.Unlock()
+
 	// set the text of the chatInput
 	u.chatInput.Text = u.userInput
 
@@ -96,6 +106,7 @@ func NewUI() UserUI {
 
 	chatPane := widgets.NewList()
 	chatPane.BorderStyle.Fg = ui.ColorMagenta
+	chatPane.WrapText = true
 
 	// Create the main grid and insert all the widgets to form the UI
 	grid := ui.NewGrid()
@@ -126,4 +137,14 @@ func bigChungus(slice []rune, chunkSize int) [][]rune {
 	}
 
 	return chunks
+}
+
+func (u *UserUI) handleScrollUp() {
+	// The scroll amounts have been deduced from experiments, as it seems that
+	// the amount '1' doesn't correlate to a single line
+	u.chatPane.ScrollAmount(-30)
+}
+
+func (u *UserUI) handleScrollDown() {
+	u.chatPane.ScrollAmount(30)
 }
