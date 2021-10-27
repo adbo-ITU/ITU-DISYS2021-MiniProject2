@@ -39,10 +39,13 @@ func (u *UserUI) HandleUIEvents(systemExitChan chan<- bool) {
 			log.Println("Received UI event for <Enter>")
 			// send a message
 			if len(u.userInput) > 0 {
-				u.messageStream <- u.userInput
+				buffer := u.userInput
 				// clear the user input box
 				u.userInput = ""
 				u.chatInput.Text = ""
+				u.Render()
+				// send buffered message
+				u.messageStream <- buffer
 			}
 		case "<Escape>", "<C-c>":
 			log.Println("Received UI event for program exit")
