@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"disysminiproject2/service"
 	"fmt"
 	"log"
@@ -21,12 +20,13 @@ type ChittyChatServer struct {
 	clock   service.VectorClock
 }
 
-func (c *ChittyChatServer) Publish(context context.Context, message *service.Message) (*emptypb.Empty, error) {
+func (c *ChittyChatServer) Publish(stream service.Chittychat_PublishServer) error {
 	// Communication: messages coming from the clients to the sever
 	// TODO: process messages from the client and get them over to broadcast
 
-	return nil, status.Errorf(codes.Unimplemented, "method Publish not implemented")
+	return status.Errorf(codes.Unimplemented, "method Publish not implemented")
 }
+
 func (c *ChittyChatServer) Broadcast(_ *emptypb.Empty, stream service.Chittychat_BroadcastServer) error {
 	// Communication: messages clients needs to go to all clients
 	// TODO: send all messages coming in from publish to all messages
