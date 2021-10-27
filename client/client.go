@@ -83,17 +83,18 @@ func listenForMessages(stream service.Chittychat_ChatSessionClient, messagesChan
 }
 
 func FormatMessageContent(msg *service.UserMessage) string {
+	fmtClock := service.FormatVectorClockAsString(msg.Message.Clock)
 	switch msg.Event {
 	case service.UserMessage_SET_UID:
 		return fmt.Sprintf("Set uid to %v", msg.User)
 	case service.UserMessage_MESSAGE:
-		return fmt.Sprintf("[%s] %s", msg.User, msg.Message.Content)
+		return fmt.Sprintf("[%s] %s\n%s", msg.User, fmtClock, msg.Message.Content)
 	case service.UserMessage_DISCONNECT:
-		return fmt.Sprintf("%s disconnected from the chat", msg.User)
+		return fmt.Sprintf("%s\n%s disconnected from the chat", fmtClock, msg.User)
 	case service.UserMessage_JOIN:
-		return fmt.Sprintf("%s joined the chat", msg.User)
+		return fmt.Sprintf("%s\n%s joined the chat", fmtClock, msg.User)
 	case service.UserMessage_ERROR:
-		return fmt.Sprintf("%s crashed and left the chat", msg.User)
+		return fmt.Sprintf("%s\n%s crashed and left the chat", fmtClock, msg.User)
 	}
 	return ""
 }
