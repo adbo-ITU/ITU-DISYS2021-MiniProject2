@@ -4,23 +4,21 @@ import (
 	"disysminiproject2/service"
 	"log"
 	"strings"
+	"sync"
 
 	ui "github.com/gizak/termui/v3"
 	"github.com/gizak/termui/v3/widgets"
 )
 
 type UserUI struct {
-	grid      *ui.Grid
-	chatInput *widgets.Paragraph
-	chatPane  *widgets.List
-
-	userInput        string
-	chatWindowOffset int
-	chatWindowHeight int
-
+	grid          *ui.Grid
+	chatInput     *widgets.Paragraph
+	chatPane      *widgets.List
+	userInput     string
 	uiEvents      <-chan ui.Event
 	chatEvents    chan *service.UserMessage
 	messageStream chan string
+	renderArbiter sync.Mutex
 }
 
 func (u *UserUI) HandleChatMessages() {
@@ -29,13 +27,10 @@ func (u *UserUI) HandleChatMessages() {
 		msg := <-u.chatEvents
 		formattedMsg := FormatMessageContent(msg)
 		u.chatPane.Rows = append(u.chatPane.Rows, formattedMsg)
+		u.chatPane.ScrollDown()
 		log.Println(formattedMsg)
 		u.Render()
 	}
-}
-
-func (u *UserUI) handleScrollUp() {
-
 }
 
 func (u *UserUI) HandleUIEvents(systemExitChan chan<- bool) {
@@ -53,14 +48,9 @@ func (u *UserUI) HandleUIEvents(systemExitChan chan<- bool) {
 				u.chatInput.Text = ""
 			}
 		case "<Up>":
-
-			u.chatWindowOffset++
+			u.handleScrollUp()
 		case "<Down>":
-			if u.chatWindowOffset > 0 {
-				u.chatWindowOffset++
-			}
-		case "<C-Up>":
-			u.chatWindowOffset = 0
+			u.handleScrollDown()
 		case "<Escape>", "<C-c>":
 			log.Println("Received UI event for program exit")
 			systemExitChan <- true
@@ -84,6 +74,9 @@ func (u *UserUI) HandleUIEvents(systemExitChan chan<- bool) {
 }
 
 func (u *UserUI) Render() {
+	u.renderArbiter.Lock()
+	defer u.renderArbiter.Unlock()
+
 	// set the text of the chatInput
 	u.chatInput.Text = u.userInput
 
@@ -98,8 +91,6 @@ func (u *UserUI) Render() {
 	}
 	u.chatInput.Text = strings.Join(inputLinesStrs, "\n")
 
-	// Here we work out how to scroll the chat box for all messages received
-
 	ui.Render(u.grid)
 }
 
@@ -112,6 +103,7 @@ func NewUI() UserUI {
 
 	chatPane := widgets.NewList()
 	chatPane.BorderStyle.Fg = ui.ColorMagenta
+	chatPane.WrapText = true
 
 	// Create the main grid and insert all the widgets to form the UI
 	grid := ui.NewGrid()
@@ -142,4 +134,14 @@ func bigChungus(slice []rune, chunkSize int) [][]rune {
 	}
 
 	return chunks
+}
+
+func (u *UserUI) handleScrollUp() {
+	// The scroll amounts have been deduced from experiments, as it seems that
+	// the amount '1' doesn't correlate to a single line
+	u.chatPane.ScrollAmount(-30)
+}
+
+func (u *UserUI) handleScrollDown() {
+	u.chatPane.ScrollAmount(30)
 }
