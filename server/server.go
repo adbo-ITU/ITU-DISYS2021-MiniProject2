@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"disysminiproject2/service"
 	"fmt"
 	"log"
@@ -9,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type ChittyChatServer struct {
@@ -19,44 +21,17 @@ type ChittyChatServer struct {
 	clock   service.VectorClock
 }
 
-func (c *ChittyChatServer) addClient(id string, conn service.Chittychat_ChatSessionServer) error {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+func (c *ChittyChatServer) Publish(context context.Context, message *service.Message) (*emptypb.Empty, error) {
+	// Communication: messages coming from the clients to the sever
+	// TODO: process messages from the client and get them over to broadcast
 
-	if _, ok := c.clients[id]; ok {
-		return fmt.Errorf("user id already exists: %s", id)
-	}
-	c.clients[id] = conn
-	c.clock[id] = 0
-	return nil
+	return nil, status.Errorf(codes.Unimplemented, "method Publish not implemented")
 }
+func (c *ChittyChatServer) Broadcast(_ *emptypb.Empty, stream service.Chittychat_BroadcastServer) error {
+	// Communication: messages clients needs to go to all clients
+	// TODO: send all messages coming in from publish to all messages
 
-func (c *ChittyChatServer) removeClient(id string) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	delete(c.clients, id)
-	delete(c.clock, id)
-}
-
-// func (c *ChittyChatServer) getClient(id string) (service.Chittychat_ChatSessionServer, error) {
-// 	c.mutex.Lock()
-// 	defer c.mutex.Unlock()
-
-// 	if _, ok := c.clients[id]; !ok {
-// 		return nil, fmt.Errorf("user id does not exist: %s", id)
-// 	}
-
-// 	return c.clients[id], nil
-// }
-
-func (c *ChittyChatServer) getAllClients() map[string]service.Chittychat_ChatSessionServer {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	clone := make(map[string]service.Chittychat_ChatSessionServer)
-	for k, v := range c.clients {
-		clone[k] = v
-	}
-	return clone
+	return status.Errorf(codes.Unimplemented, "method Broadcast not implemented")
 }
 
 func (c *ChittyChatServer) ChatSession(stream service.Chittychat_ChatSessionServer) error {
@@ -103,6 +78,35 @@ func (c *ChittyChatServer) ChatSession(stream service.Chittychat_ChatSessionServ
 	}
 }
 
+func (c *ChittyChatServer) getAllClients() map[string]service.Chittychat_ChatSessionServer {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	clone := make(map[string]service.Chittychat_ChatSessionServer)
+	for k, v := range c.clients {
+		clone[k] = v
+	}
+	return clone
+}
+
+func (c *ChittyChatServer) addClient(id string, conn service.Chittychat_ChatSessionServer) error {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	if _, ok := c.clients[id]; ok {
+		return fmt.Errorf("user id already exists: %s", id)
+	}
+	c.clients[id] = conn
+	c.clock[id] = 0
+	return nil
+}
+
+func (c *ChittyChatServer) removeClient(id string) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	delete(c.clients, id)
+	delete(c.clock, id)
+}
+
 func (c *ChittyChatServer) broadcastMessage(content string, uid string, event service.UserMessage_EventType) {
 	c.incrementOwnClock()
 	for _, v := range c.getAllClients() {
@@ -120,3 +124,14 @@ func (c *ChittyChatServer) incrementOwnClock() {
 	defer c.mutex.Unlock()
 	c.clock["server"]++
 }
+
+// func (c *ChittyChatServer) getClient(id string) (service.Chittychat_ChatSessionServer, error) {
+// 	c.mutex.Lock()
+// 	defer c.mutex.Unlock()
+
+// 	if _, ok := c.clients[id]; !ok {
+// 		return nil, fmt.Errorf("user id does not exist: %s", id)
+// 	}
+
+// 	return c.clients[id], nil
+// }
