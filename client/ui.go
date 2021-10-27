@@ -10,10 +10,14 @@ import (
 )
 
 type UserUI struct {
-	grid          *ui.Grid
-	chatInput     *widgets.Paragraph
-	chatPane      *widgets.List
-	userInput     string
+	grid      *ui.Grid
+	chatInput *widgets.Paragraph
+	chatPane  *widgets.List
+
+	userInput        string
+	chatWindowOffset int
+	chatWindowHeight int
+
 	uiEvents      <-chan ui.Event
 	chatEvents    chan *service.UserMessage
 	messageStream chan string
@@ -30,6 +34,10 @@ func (u *UserUI) HandleChatMessages() {
 	}
 }
 
+func (u *UserUI) handleScrollUp() {
+
+}
+
 func (u *UserUI) HandleUIEvents(systemExitChan chan<- bool) {
 	for {
 		log.Println("Starting to listen for UI events")
@@ -44,6 +52,15 @@ func (u *UserUI) HandleUIEvents(systemExitChan chan<- bool) {
 				u.userInput = ""
 				u.chatInput.Text = ""
 			}
+		case "<Up>":
+
+			u.chatWindowOffset++
+		case "<Down>":
+			if u.chatWindowOffset > 0 {
+				u.chatWindowOffset++
+			}
+		case "<C-Up>":
+			u.chatWindowOffset = 0
 		case "<Escape>", "<C-c>":
 			log.Println("Received UI event for program exit")
 			systemExitChan <- true
@@ -80,6 +97,8 @@ func (u *UserUI) Render() {
 		inputLinesStrs[maxHeightForInput-i-1] = string(inputLines[len(inputLines)-i-1])
 	}
 	u.chatInput.Text = strings.Join(inputLinesStrs, "\n")
+
+	// Here we work out how to scroll the chat box for all messages received
 
 	ui.Render(u.grid)
 }
