@@ -12,11 +12,6 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-/*
-	* Rewrite to publish/broadcast TODO:
-		- Look into the formatting of user messages, it looks weird
-*/
-
 type ChittyChatServer struct {
 	service.UnimplementedChittychatServer
 
