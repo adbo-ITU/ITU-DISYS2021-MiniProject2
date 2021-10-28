@@ -19,7 +19,6 @@ type ChittyChatServer struct {
 	mutex   sync.Mutex
 	clock   service.VectorClock
 
-	incomingMessages     chan *service.UserMessage
 	manyIncomingMessages map[string]chan *service.UserMessage
 }
 
@@ -27,7 +26,6 @@ func NewServer() ChittyChatServer {
 	return ChittyChatServer{
 		clients:              make(map[string]service.Chittychat_BroadcastServer),
 		clock:                make(map[string]uint32),
-		incomingMessages:     make(chan *service.UserMessage, 1000),
 		manyIncomingMessages: make(map[string](chan *service.UserMessage)),
 	}
 }
@@ -77,7 +75,7 @@ func (c *ChittyChatServer) Broadcast(_ *emptypb.Empty, stream service.Chittychat
 	// Each broadcast call will live in its own goroutine - serving one client each
 	// https://github.com/grpc/grpc-go/blob/master/Documentation/concurrency.md#servers
 
-	// Communication: messages clients needs to go to all clientss
+	// Communication: messages clients needs to go to all clients
 
 	log.Println("New user joined")
 	uid := uuid.Must(uuid.NewRandom()).String()[0:4]
