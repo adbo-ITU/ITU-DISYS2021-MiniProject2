@@ -70,6 +70,7 @@ func (c *ChittyChatServer) removeClient(id string) {
 	defer c.mutex.Unlock()
 	delete(c.clients, id)
 	delete(c.clock, id)
+	delete(c.usernames, id)
 }
 
 // func (c *ChittyChatServer) getClient(id string) (service.Chittychat_ChatSessionServer, error) {
