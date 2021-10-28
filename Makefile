@@ -4,9 +4,9 @@ proto:
 
 
 .PHONY: client
-run-client:
+client:
 	go run client/*.go
 
 .PHONY: server
-run-server:
+server:
 	go run server/*.go
