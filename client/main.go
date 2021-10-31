@@ -5,6 +5,7 @@ import (
 	"disysminiproject2/service"
 	"fmt"
 	"log"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -102,7 +103,8 @@ func listenForMessages(stream service.Chittychat_ChatSessionClient) {
 			log.Printf("%v set uid to %s\n", fmtClock, msg.User)
 			uid = msg.User
 		case service.UserMessage_INVALID_USERNAME:
-			log.Printf("%v Usernmae %s already taken. Please rejoin with new name\n", fmtClock, username)
+			log.Printf("%v Username %s already taken. Please rejoin with new name\n", fmtClock, username)
+			os.Exit(1)
 		case service.UserMessage_MESSAGE:
 			log.Printf("%v %s: %s\n", fmtClock, msg.User, msg.Message.Content)
 		case service.UserMessage_DISCONNECT:
