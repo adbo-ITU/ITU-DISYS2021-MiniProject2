@@ -23,7 +23,7 @@ message UserMessage {
         DISCONNECT = 1;
         JOIN = 2;
         ERROR = 3;
-        SET_UID = 4;
+        SET_USERNAME = 4;
     }
 
     string user = 1;

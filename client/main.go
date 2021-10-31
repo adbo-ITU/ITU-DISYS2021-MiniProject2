@@ -13,7 +13,7 @@ import (
 
 // This is dirty
 var (
-	uid        string
+	username   string
 	clock      service.VectorClock
 	clockMutex sync.Mutex
 )
@@ -39,6 +39,16 @@ func main() {
 	fmt.Println("Done!")
 	defer conn.Close()
 
+	fmt.Print("Please enter your wanted username: ")
+	fmt.Scan(&username)
+
+	clock = make(service.VectorClock)
+	clock[username] = 0
+
+	chatEvents := make(chan (*service.UserMessage), 1000)
+	messageStream := make(chan (string))
+	StartClient(conn, messageStream, chatEvents)
+
 	// Create the UI
 	if err := ui.Init(); err != nil {
 		log.Fatalf("failed to initialize termui: %v", err)
@@ -48,8 +58,7 @@ func main() {
 	// going to listen to this channel later to stop main thread from exiting
 	systemExitChannel := make(chan (bool))
 
-	theUI := NewUI()
-	StartClient(conn, theUI.messageStream, theUI.chatEvents)
+	theUI := NewUI(chatEvents, messageStream)
 	theUI.uiEvents = ui.PollEvents()
 	theUI.Render()
 

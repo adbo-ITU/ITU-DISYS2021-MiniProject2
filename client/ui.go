@@ -99,7 +99,7 @@ func (u *UserUI) Render() {
 	ui.Render(u.grid)
 }
 
-func NewUI() UserUI {
+func NewUI(chatEvents chan *service.UserMessage, messageStream chan string) UserUI {
 	width, height := ui.TerminalDimensions()
 
 	// Create the boxes within the window
@@ -118,10 +118,7 @@ func NewUI() UserUI {
 		ui.NewRow(0.2, chatInput),
 	)
 
-	messagesChannel := make(chan (*service.UserMessage), 1000)
-	messageStream := make(chan (string))
-
-	return UserUI{grid: grid, chatInput: chatInput, chatPane: chatPane, chatEvents: messagesChannel, messageStream: messageStream}
+	return UserUI{grid: grid, chatInput: chatInput, chatPane: chatPane, chatEvents: chatEvents, messageStream: messageStream}
 }
 
 func (u *UserUI) manuallyWrapLines(text string) []string {

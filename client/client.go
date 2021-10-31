@@ -24,14 +24,16 @@ func StartClient(conn grpc.ClientConnInterface, messageSends <-chan string, mess
 		log.Fatal("Failed to open up for publishing chat messages")
 	}
 
-	msg, err := inStream.Recv()
-	if msg.Event != service.UserMessage_SET_UID || err != nil {
-		log.Fatalf("Failed to get uid: %v", err)
-	}
-	uid = msg.User
-	clock = msg.Message.Clock
+	setUsername(outStream)
+
 	go listenForMessages(inStream, messageReceives)
 	go messageSender(outStream, messageSends)
+}
+
+func setUsername(outStream service.Chittychat_PublishClient) {
+	message := service.Message{Clock: clock, Content: ""}
+	userMessage := service.UserMessage{User: username, Event: service.UserMessage_SET_USERNAME, Message: &message}
+	outStream.Send(&userMessage)
 }
 
 func messageSender(stream service.Chittychat_PublishClient, messages <-chan string) {
@@ -42,11 +44,11 @@ func messageSender(stream service.Chittychat_PublishClient, messages <-chan stri
 
 		// Increment clock count
 		clockMutex.Lock()
-		clock[uid]++
+		clock[username]++
 		clockMutex.Unlock()
 
 		message := service.Message{Clock: clock, Content: text}
-		userMessage := service.UserMessage{User: uid, Event: service.UserMessage_MESSAGE, Message: &message}
+		userMessage := service.UserMessage{User: username, Event: service.UserMessage_MESSAGE, Message: &message}
 		log.Printf("Sending message to sever with contents: %s, clock: %s", text, service.FormatVectorClockAsString(clock))
 		stream.Send(&userMessage)
 	}
@@ -64,27 +66,21 @@ func listenForMessages(stream service.Chittychat_BroadcastClient, messagesChanne
 
 		clockMutex.Lock()
 		clock = service.MergeClocks(clock, msg.Message.Clock)
-		clock[uid]++
-		fmtClock := service.FormatVectorClockAsString(clock)
+		clock[username]++
 		clockMutex.Unlock()
-		messagesChannel <- msg
-		switch msg.Event {
-		case service.UserMessage_SET_UID:
-			log.Printf("%v set uid to %s\n", fmtClock, msg.User)
-			uid = msg.User
-		case service.UserMessage_MESSAGE:
-			log.Printf("%v %s: %s\n", fmtClock, msg.User, msg.Message.Content)
-		case service.UserMessage_DISCONNECT:
-			log.Printf("%v %s disconnected\n", fmtClock, msg.User)
+
+		if msg.Event != service.UserMessage_SET_USERNAME {
+			messagesChannel <- msg
+		}
+		msg.Message.Clock = clock
+
+		log.Printf("%s\n", FormatMessageContent(msg))
+		if msg.Event == service.UserMessage_DISCONNECT {
 			// We don't want to keep dead users around, so we remove it from the
 			// local clock map.
 			clockMutex.Lock()
 			delete(clock, msg.User)
 			clockMutex.Unlock()
-		case service.UserMessage_JOIN:
-			log.Printf("%v %s joined\n", fmtClock, msg.User)
-		case service.UserMessage_ERROR:
-			log.Printf("%v %s crashed\n", fmtClock, msg.User)
 		}
 	}
 }
@@ -92,8 +88,6 @@ func listenForMessages(stream service.Chittychat_BroadcastClient, messagesChanne
 func FormatMessageContent(msg *service.UserMessage) string {
 	fmtClock := service.FormatVectorClockAsString(msg.Message.Clock)
 	switch msg.Event {
-	case service.UserMessage_SET_UID:
-		return fmt.Sprintf("Set uid to %v", msg.User)
 	case service.UserMessage_MESSAGE:
 		return fmt.Sprintf("[%s] %s\n%s", msg.User, fmtClock, msg.Message.Content)
 	case service.UserMessage_DISCONNECT:
@@ -102,6 +96,8 @@ func FormatMessageContent(msg *service.UserMessage) string {
 		return fmt.Sprintf("%s\n%s joined the chat", fmtClock, msg.User)
 	case service.UserMessage_ERROR:
 		return fmt.Sprintf("%s\n%s crashed and left the chat", fmtClock, msg.User)
+	case service.UserMessage_SET_USERNAME:
+		return fmt.Sprintf("%s\nset username to %s", fmtClock, msg.User)
 	}
 	return ""
 }
