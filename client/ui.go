@@ -40,7 +40,6 @@ func (u *UserUI) HandleChatMessages() {
 
 func (u *UserUI) HandleUIEvents(systemExitChan chan<- bool) {
 	for {
-		log.Println("Starting to listen for UI events")
 		e := <-u.uiEvents
 		switch e.ID {
 		case "<Enter>":
@@ -71,7 +70,6 @@ func (u *UserUI) HandleUIEvents(systemExitChan chan<- bool) {
 		case "<Space>":
 			u.userInput += " "
 		default:
-			log.Println("Received UI event for inserting a character in chat box")
 			if IsLegalCharacter(e.ID) {
 				u.userInput += e.ID
 			}
