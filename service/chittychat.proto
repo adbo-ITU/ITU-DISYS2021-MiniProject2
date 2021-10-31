@@ -21,6 +21,7 @@ message UserMessage {
         DISCONNECT = 1;
         JOIN = 2;
         ERROR = 3;
+        SET_UID = 4;
         SET_USERNAME = 5;
         INVALID_USERNAME = 6;
     }
