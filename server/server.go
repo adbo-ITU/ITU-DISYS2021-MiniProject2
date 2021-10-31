@@ -55,7 +55,7 @@ func (c *ChittyChatServer) addUsername(uid string, conn service.Chittychat_ChatS
 	username := msg.Content
 
 	if containsUsername(username, c.usernames) {
-		fmt.Printf("U: %s", username)
+		log.Printf("User tried to join with existing username: %s\n", username)
 		message := service.UserMessage{Message: c.newMessage(""), User: c.usernames[uid], Event: service.UserMessage_INVALID_USERNAME}
 		conn.Send(&message)
 		return fmt.Errorf("username already exists: %s", username)
