@@ -41,6 +41,9 @@ func main() {
 	}
 
 	msg, err := stream.Recv()
+	if msg.Event != service.UserMessage_SET_UID || err != nil {
+		log.Fatalf("Failed to get uid: %v", err)
+	}
 
 	uid = msg.User
 	clock = msg.Message.Clock
@@ -48,10 +51,6 @@ func main() {
 	clockMutex.Lock()
 	clock[uid]++
 	clockMutex.Unlock()
-
-	if msg.Event != service.UserMessage_SET_UID || err != nil {
-		log.Fatalf("Failed to get uid: %v", err)
-	}
 
 	msg, err = stream.Recv()
 	if msg.Event != service.UserMessage_SET_USERNAME || err != nil {
@@ -63,7 +62,7 @@ func main() {
 	fmtClock := service.FormatVectorClockAsString(clock)
 	clockMutex.Unlock()
 
-	log.Printf("%v please enter wanted username\n", fmtClock)
+	fmt.Printf("%v\nPlease enter wanted username: ", fmtClock)
 	fmt.Scan(&username)
 
 	message := service.Message{Clock: clock, Content: username}
