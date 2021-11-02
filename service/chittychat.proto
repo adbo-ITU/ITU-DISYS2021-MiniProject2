@@ -5,18 +5,26 @@ option go_package = "disysminiproject2/service";
 
 package chittychat;
 
-
+//Server structure with two seperate rpc methods Publish and Broadcast
+//Publish receives an incomming stream of messagees
+//Broadcast send and outgoing stream of messages
 service chittychat {
     rpc Publish(stream UserMessage) returns (google.protobuf.Empty) {};
     rpc Broadcast(google.protobuf.Empty) returns (stream UserMessage) {};
 }
 
-
+//Message structure
+//A message contains the vector clcok of its sender in the form
+//of a map from username string to timestamp interger and content in
+//the form of a string
 message Message {
     map<string, uint32> clock = 1;
     string content = 2;
 }
 
+//Usermessage structure
+//Contains a Message as well as a user represented by their username string and
+//an event that is either of the types defined in the EventType Enum
 message UserMessage {
     enum EventType {
         MESSAGE = 0;

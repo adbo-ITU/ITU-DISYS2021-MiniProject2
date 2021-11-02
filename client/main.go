@@ -11,47 +11,54 @@ import (
 	"google.golang.org/grpc"
 )
 
-// This is dirty
+// Client structure with own username and local copy of vectorclock
 var (
 	username   string
 	clock      service.VectorClock
 	clockMutex sync.Mutex
 )
 
+//Create new client
 func main() {
 
-	f, err := os.OpenFile("other.log", os.O_RDWR|os.O_CREATE, 0666)
+	//Access shared log file and set as target of prints.
+	//Ensure file is closed after client disconnects by use of defer
+
+	f, err := os.OpenFile("client.log", os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
-		log.Fatalf("error opening file: %v", err)
+		log.Fatalf("error opening file: %s", err)
 	}
 	defer f.Close()
 
 	log.SetOutput(f)
 
 	log.Println("Starting the system")
-	address := "127.0.0.1:3333"
+	address := "127.0.0.1:3333" //Set address depending on local port
 
+	//Try connecting to server and abort program in case of conenction error
 	fmt.Print("Connecting.. ")
 	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
-		log.Fatalf("There were an error: %v", err)
+		log.Fatalf("There were an error: %s", err)
 	}
 	fmt.Println("Done!")
 	defer conn.Close()
 
+	//Prompt user for wanted username
 	fmt.Print("Please enter your wanted username: ")
 	fmt.Scan(&username)
 
+	//Make clock map, that contains clients local copy of the vector clock, and add the user
 	clock = make(service.VectorClock)
 	clock[username] = 0
 
-	chatEvents := make(chan (*service.UserMessage), 1000)
-	messageStream := make(chan (string))
+	chatEvents := make(chan (*service.UserMessage), 1000) //Create channel for incomming messages
+	messageStream := make(chan (string))                  //Create channel for outgoing messages
 	StartClient(conn, messageStream, chatEvents)
 
 	// Create the UI
 	if err := ui.Init(); err != nil {
-		log.Fatalf("failed to initialize termui: %v", err)
+		log.Fatalf("failed to initialize termui: %s", err)
 	}
 	defer ui.Close()
 
@@ -62,6 +69,7 @@ func main() {
 	theUI.uiEvents = ui.PollEvents()
 	theUI.Render()
 
+	//Ensure that UI continously handles events and messages
 	go theUI.HandleUIEvents(systemExitChannel)
 	go theUI.HandleChatMessages()
 

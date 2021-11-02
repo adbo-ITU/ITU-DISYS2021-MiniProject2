@@ -1,5 +1,12 @@
 package main
 
+/*
+ * NOTE FOR THE TEACHING ASSISTANT: This whole file is just to separate most of
+ * the UI code into its own file. This is not really relevant for the assignment
+ * (which is more about gRPC and logical clocks), so we have omitted to write
+ * comments here, and you probably don't even need to read this file.
+ */
+
 import (
 	"disysminiproject2/service"
 	"log"
@@ -10,7 +17,7 @@ import (
 	"github.com/gizak/termui/v3/widgets"
 )
 
-type UserUI struct {
+type GUI struct {
 	grid          *ui.Grid
 	chatInput     *widgets.Paragraph
 	chatPane      *widgets.List
@@ -21,7 +28,7 @@ type UserUI struct {
 	renderArbiter sync.Mutex
 }
 
-func (u *UserUI) HandleChatMessages() {
+func (u *GUI) HandleChatMessages() {
 	log.Println("Starting to listen for chat messages from the server")
 	for {
 		msg := <-u.chatEvents
@@ -38,7 +45,7 @@ func (u *UserUI) HandleChatMessages() {
 	}
 }
 
-func (u *UserUI) HandleUIEvents(systemExitChan chan<- bool) {
+func (u *GUI) HandleUIEvents(systemExitChan chan<- bool) {
 	for {
 		e := <-u.uiEvents
 		switch e.ID {
@@ -79,7 +86,7 @@ func (u *UserUI) HandleUIEvents(systemExitChan chan<- bool) {
 	}
 }
 
-func (u *UserUI) Render() {
+func (u *GUI) Render() {
 	u.renderArbiter.Lock()
 	defer u.renderArbiter.Unlock()
 
@@ -99,13 +106,16 @@ func (u *UserUI) Render() {
 	ui.Render(u.grid)
 }
 
-func NewUI(chatEvents chan *service.UserMessage, messageStream chan string) UserUI {
+func NewUI(chatEvents chan *service.UserMessage, messageStream chan string) GUI {
 	width, height := ui.TerminalDimensions()
 
 	// Create the boxes within the window
+
+	// Chat input is the percieved text box the user types into
 	chatInput := widgets.NewParagraph()
 	chatInput.BorderStyle.Fg = ui.ColorBlue
 
+	// Chat pane is the box where chat messages that are received lives
 	chatPane := widgets.NewList()
 	chatPane.BorderStyle.Fg = ui.ColorMagenta
 	chatPane.WrapText = true
@@ -118,10 +128,10 @@ func NewUI(chatEvents chan *service.UserMessage, messageStream chan string) User
 		ui.NewRow(0.2, chatInput),
 	)
 
-	return UserUI{grid: grid, chatInput: chatInput, chatPane: chatPane, chatEvents: chatEvents, messageStream: messageStream}
+	return GUI{grid: grid, chatInput: chatInput, chatPane: chatPane, chatEvents: chatEvents, messageStream: messageStream}
 }
 
-func (u *UserUI) manuallyWrapLines(text string) []string {
+func (u *GUI) manuallyWrapLines(text string) []string {
 	maxLengthForInput := u.chatInput.Inner.Size().X
 	lines := strings.Split(text, "\n")
 	outLines := make([]string, 0)
@@ -150,12 +160,14 @@ func bigChungus(slice []rune, chunkSize int) [][]rune {
 	return chunks
 }
 
-func (u *UserUI) handleScrollUp() {
+func (u *GUI) handleScrollUp() {
 	// The scroll amounts have been deduced from experiments, as it seems that
 	// the amount '1' doesn't correlate to a single line
+	// This _MIGHT_ be sufficient for your terminal to scroll a bit from a single key stroke,
+	// but it cannot be guaranteed from testing on different group members computers.s
 	u.chatPane.ScrollAmount(-30)
 }
 
-func (u *UserUI) handleScrollDown() {
+func (u *GUI) handleScrollDown() {
 	u.chatPane.ScrollAmount(30)
 }
