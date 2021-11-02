@@ -47,11 +47,13 @@ func (c *ChittyChatServer) Publish(stream service.Chittychat_PublishServer) erro
 		if e, errOk := status.FromError(err); errOk && err != nil && e.Code() == codes.Canceled {
 			log.Printf("[%v] User exited\n", cachedUsername)
 			c.broadcastServiceMessage("", cachedUsername, service.UserMessage_DISCONNECT)
+			c.removeClient(cachedUsername) //Added this as diconnected users remined in clock
 			return nil
 		}
 		if err != nil {
 			log.Printf("[%v] Error on receive: %v\n", msg.User, err)
 			c.broadcastServiceMessage("", msg.User, service.UserMessage_ERROR)
+			c.removeClient(cachedUsername) //Added this, as disconnected users remained
 			return err
 		}
 
@@ -89,7 +91,11 @@ func (c *ChittyChatServer) Broadcast(_ *emptypb.Empty, stream service.Chittychat
 	username := usernameMsg.User
 	log.Printf("%s was assigned with username %s\n", uid, username)
 
+	c.mutex.Lock() //Added the merging of clocks here, client clock should exist
+	c.clock = service.MergeClocks(c.clock, usernameMsg.Message.Clock)
+	c.mutex.Unlock()
 	c.incrementOwnClock()
+
 	err := c.addClient(uid, username, stream)
 	if err != nil {
 		log.Printf("Client join error: %v\n", err)
@@ -157,6 +163,7 @@ func (c *ChittyChatServer) removeClient(id string) {
 	defer c.mutex.Unlock()
 	delete(c.clients, id)
 	delete(c.clock, id)
+	delete(c.usernames, id) //Added this delete
 }
 
 func (c *ChittyChatServer) broadcastServiceMessage(content string, username string, event service.UserMessage_EventType) {

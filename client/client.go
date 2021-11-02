@@ -24,7 +24,7 @@ func StartClient(conn grpc.ClientConnInterface, messageSends <-chan string, mess
 		log.Fatal("Failed to open up for publishing chat messages")
 	}
 
-	setUsername(outStream)
+	setUsername(outStream) //THis is just to send username to server
 
 	go listenForMessages(inStream, messageReceives)
 	go messageSender(outStream, messageSends)
@@ -69,7 +69,7 @@ func listenForMessages(stream service.Chittychat_BroadcastClient, messagesChanne
 		clock[username]++
 		clockMutex.Unlock()
 
-		if msg.Event != service.UserMessage_SET_USERNAME {
+		if msg.Event != service.UserMessage_SET_USERNAME { //Is SET_USERNAME ever necessary? It has a formatting case, but is never printed?
 			messagesChannel <- msg
 		}
 		msg.Message.Clock = clock
