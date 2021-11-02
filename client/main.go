@@ -21,15 +21,20 @@ var (
 //Create new client
 func main() {
 
-	//Access shared log file and set as target of prints.
-	//Ensure file is closed after client disconnects by use of defer
+	//Prompt user for wanted username
+	fmt.Print("Please enter your wanted username: ")
+	fmt.Scan(&username)
 
-	f, err := os.OpenFile("client.log", os.O_RDWR|os.O_CREATE, 0666)
+	//Ensure file is closed after client disconnects by use of defer
+	// Create a file name or the clients log that is infixed with a unit timestamp
+	// in nanoseconds, to hopefully avoid shared/overwritten log files
+	logFilename := fmt.Sprintf("client-%s.log", username)
+	os.Remove(logFilename) // Clean up from a previous client run
+	f, err := os.OpenFile(logFilename, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		log.Fatalf("error opening file: %s", err)
 	}
 	defer f.Close()
-
 	log.SetOutput(f)
 
 	log.Println("Starting the system")
@@ -43,10 +48,6 @@ func main() {
 	}
 	fmt.Println("Done!")
 	defer conn.Close()
-
-	//Prompt user for wanted username
-	fmt.Print("Please enter your wanted username: ")
-	fmt.Scan(&username)
 
 	//Make clock map, that contains clients local copy of the vector clock, and add the user
 	clock = make(service.VectorClock)

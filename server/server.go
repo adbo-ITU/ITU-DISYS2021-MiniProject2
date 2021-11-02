@@ -142,11 +142,14 @@ func (c *ChittyChatServer) Broadcast(_ *emptypb.Empty, stream service.Chittychat
 		c.mutex.Unlock()
 		c.incrementOwnClock()
 
+		// Set the clock of the message to the updated clock, to avoid stale clocks being passed around
+		msg.Message.Clock = c.clock
+
 		// Actually send that message over the network to the connected client
 		err = c.clients[uid].Send(msg)
 		if err != nil {
 			// Something must have gone wrong with sending, just drop the client
-			return fmt.Errorf("Something went wrong, dropping client: %v", err)
+			return fmt.Errorf("something went wrong, dropping client: %v", err)
 		}
 	}
 }

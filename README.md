@@ -55,12 +55,34 @@ The following three subsections show log output for a chat session where two use
 
 ### Example server log
 
-TBA.
+```text
+2021/11/02 12:22:12 Started serverd
+2021/11/02 12:22:17 New user joined: 260364a4-b23a-4f98-aacc-0cdb376c0c04
+2021/11/02 12:22:17 [A] <A: 1, server: 1> 
+2021/11/02 12:22:17 260364a4-b23a-4f98-aacc-0cdb376c0c04 was assigned with username A
+2021/11/02 12:22:23 New user joined: ecf566ce-7ab2-4b8b-a281-e00db0420a43
+2021/11/02 12:22:23 [B] <A: 0, B: 1, server: 5> 
+2021/11/02 12:22:23 ecf566ce-7ab2-4b8b-a281-e00db0420a43 was assigned with username B
+2021/11/02 12:22:28 New user joined: 6924f5a8-7b5e-44f5-a767-d78e589a9cc7
+2021/11/02 12:22:28 [C] <A: 0, B: 0, C: 1, server: 11> 
+2021/11/02 12:22:28 6924f5a8-7b5e-44f5-a767-d78e589a9cc7 was assigned with username C
+2021/11/02 12:22:33 New user joined: 0d294bb0-92a9-425b-a6a0-ce4ba22791d0
+2021/11/02 12:22:33 [D] <A: 0, B: 0, C: 1, D: 1, server: 19> 
+2021/11/02 12:22:33 0d294bb0-92a9-425b-a6a0-ce4ba22791d0 was assigned with username D
+2021/11/02 12:22:39 [A] <A: 9, B: 1, C: 1, D: 1, server: 29> Hello
+2021/11/02 12:22:45 [B] User exited
+2021/11/02 12:22:52 [C] <A: 9, C: 7, D: 1, server: 39> Hello hello
+2021/11/02 12:22:54 [A] User exited
+```
 
 ### Example client log (user "Alpha")
 
 TBA.
 
 ### Example client log (user "Bravo")
+
+TBA.
+
+### Example client log (user "Charlie")
 
 TBA.

@@ -19,7 +19,7 @@ import (
 
 const MAX_INPUT_LENGTH = 128
 
-type UserUI struct {
+type GUI struct {
 	grid          *ui.Grid
 	chatInput     *widgets.Paragraph
 	chatPane      *widgets.List
@@ -88,13 +88,13 @@ func (u *GUI) HandleUIEvents(systemExitChan chan<- bool) {
 	}
 }
 
-func (u *UserUI) addStr(input string) {
+func (u *GUI) addStr(input string) {
 	if len(u.userInput)+len(input) <= MAX_INPUT_LENGTH {
 		u.userInput += input
 	}
 }
 
-func (u *UserUI) Render() {
+func (u *GUI) Render() {
 	u.renderArbiter.Lock()
 	defer u.renderArbiter.Unlock()
 

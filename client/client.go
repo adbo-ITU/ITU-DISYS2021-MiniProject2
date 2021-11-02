@@ -43,10 +43,9 @@ func setUsername(outStream service.Chittychat_PublishClient) {
 }
 
 func incrementOwnClock() {
-	//Update Lamport timestamp by incrementing own clock before sending message
+	//Update Lamport timestamp by incrementing own clock
 	clockMutex.Lock()
 	defer clockMutex.Unlock()
-
 	clock[username]++
 }
 
@@ -74,19 +73,17 @@ func listenForMessages(stream service.Chittychat_BroadcastClient, messagesChanne
 			log.Fatalf("Failed to receive message, error: %s", err)
 		}
 
-		log.Printf("Client received message: %s\n", FormatMessageContent(msg))
-
 		//Merge clocks according to Lamport timestamps and increase own clock on receive
-		clockMutex.Lock()
 		clock = service.MergeClocks(clock, msg.Message.Clock)
-		clock[username]++
-		clockMutex.Unlock()
+		incrementOwnClock()
+		msg.Message.Clock = clock
+
+		log.Printf("Client received message: %s\n", FormatMessageContent(msg))
 
 		//Only print relevant messages to client
 		if msg.Event != service.UserMessage_SET_USERNAME {
 			messagesChannel <- msg
 		}
-		msg.Message.Clock = clock
 
 		if msg.Event == service.UserMessage_DISCONNECT {
 			// We don't want to keep dead users around, so we remove it from the
@@ -105,11 +102,11 @@ func FormatMessageContent(msg *service.UserMessage) string {
 	case service.UserMessage_MESSAGE:
 		return fmt.Sprintf("[%s] %s\n%s", msg.User, fmtClock, msg.Message.Content)
 	case service.UserMessage_DISCONNECT:
-		return fmt.Sprintf("%s\n%s disconnected from the chat", fmtClock, msg.User)
+		return fmt.Sprintf("Participant %s left Chitty-Chat at Lamport time %s", msg.User, fmtClock)
 	case service.UserMessage_JOIN:
-		return fmt.Sprintf("%s\n%s joined the chat", fmtClock, msg.User)
+		return fmt.Sprintf("Participant %s joined Chitty-Chat at Lamport time %s", msg.User, fmtClock)
 	case service.UserMessage_ERROR:
-		return fmt.Sprintf("%s\n%s crashed and left the chat", fmtClock, msg.User)
+		return fmt.Sprintf("Participant %s left Chitty-Chat at Lamport time %s", msg.User, fmtClock)
 	case service.UserMessage_SET_USERNAME:
 		return fmt.Sprintf("%s\nset username to %s", fmtClock, msg.User)
 	}
