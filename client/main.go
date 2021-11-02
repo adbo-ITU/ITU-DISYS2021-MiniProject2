@@ -1,97 +1,79 @@
 package main
 
 import (
-	"context"
 	"disysminiproject2/service"
 	"fmt"
 	"log"
-	"strconv"
+	"os"
 	"sync"
-	"time"
 
+	ui "github.com/gizak/termui/v3"
 	"google.golang.org/grpc"
 )
 
-// This is dirty
+// Client structure with own username and local copy of vectorclock
 var (
-	uid        string
+	username   string
 	clock      service.VectorClock
 	clockMutex sync.Mutex
 )
 
+//Create new client
 func main() {
-	address := "127.0.0.1:3333"
 
+	//Prompt user for wanted username
+	fmt.Print("Please enter your wanted username: ")
+	fmt.Scan(&username)
+
+	//Ensure file is closed after client disconnects by use of defer
+	// Create a file name or the clients log that is infixed with a unit timestamp
+	// in nanoseconds, to hopefully avoid shared/overwritten log files
+	logFilename := fmt.Sprintf("client-%s.log", username)
+	os.Remove(logFilename) // Clean up from a previous client run
+	f, err := os.OpenFile(logFilename, os.O_RDWR|os.O_CREATE, 0666)
+	if err != nil {
+		log.Fatalf("error opening file: %s", err)
+	}
+	defer f.Close()
+	log.SetOutput(f)
+
+	log.Println("Starting the system")
+	address := "127.0.0.1:3333" //Set address depending on local port
+
+	//Try connecting to server and abort program in case of conenction error
 	fmt.Print("Connecting.. ")
 	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
-		log.Fatalf("There were an error: %v", err)
+		log.Fatalf("There were an error: %s", err)
 	}
 	fmt.Println("Done!")
-
 	defer conn.Close()
-	client := service.NewChittychatClient(conn)
 
-	context := context.Background()
+	//Make clock map, that contains clients local copy of the vector clock, and add the user
+	clock = make(service.VectorClock)
+	clock[username] = 0
 
-	stream, err := client.ChatSession(context)
-	if err != nil {
-		log.Fatal("Failed to join chat room")
+	chatEvents := make(chan (*service.UserMessage), 1000) //Create channel for incomming messages
+	messageStream := make(chan (string))                  //Create channel for outgoing messages
+	StartClient(conn, messageStream, chatEvents)
+
+	// Create the UI
+	if err := ui.Init(); err != nil {
+		log.Fatalf("failed to initialize termui: %s", err)
 	}
+	defer ui.Close()
 
-	msg, err := stream.Recv()
-	if msg.Event != service.UserMessage_SET_UID || err != nil {
-		log.Fatalf("Failed to get uid: %v", err)
-	}
-	uid = msg.User
-	clock = msg.Message.Clock
+	// going to listen to this channel later to stop main thread from exiting
+	systemExitChannel := make(chan (bool))
 
-	go listenForMessages(stream)
+	theUI := NewUI(chatEvents, messageStream)
+	theUI.uiEvents = ui.PollEvents()
+	theUI.Render()
 
-	for i := 0; i < 10; i++ {
-		clockMutex.Lock()
-		clock[uid]++
-		clockMutex.Unlock()
-		message := service.Message{Clock: clock, Content: strconv.Itoa(i)}
-		stream.Send(&message)
-		log.Printf("%v You (%s): %s\n", service.FormatVectorClockAsString(message.Clock), uid, message.Content)
-		time.Sleep(1000 * time.Millisecond)
-	}
+	//Ensure that UI continously handles events and messages
+	go theUI.HandleUIEvents(systemExitChannel)
+	go theUI.HandleChatMessages()
 
-	fmt.Println("Press Enter to exit")
-	fmt.Scanln()
-}
-
-func listenForMessages(stream service.Chittychat_ChatSessionClient) {
-	for {
-		msg, err := stream.Recv()
-		if err != nil {
-			log.Fatal("Failed to receive message")
-		}
-
-		clockMutex.Lock()
-		clock = service.MergeClocks(clock, msg.Message.Clock)
-		clock[uid]++
-		fmtClock := service.FormatVectorClockAsString(clock)
-		clockMutex.Unlock()
-
-		switch msg.Event {
-		case service.UserMessage_SET_UID:
-			log.Printf("%v set uid to %s\n", fmtClock, msg.User)
-			uid = msg.User
-		case service.UserMessage_MESSAGE:
-			log.Printf("%v %s: %s\n", fmtClock, msg.User, msg.Message.Content)
-		case service.UserMessage_DISCONNECT:
-			log.Printf("%v %s disconnected\n", fmtClock, msg.User)
-			// We don't want to keep dead users around, so we remove it from the
-			// local clock map.
-			clockMutex.Lock()
-			delete(clock, msg.User)
-			clockMutex.Unlock()
-		case service.UserMessage_JOIN:
-			log.Printf("%v %s joined\n", fmtClock, msg.User)
-		case service.UserMessage_ERROR:
-			log.Printf("%v %s crashed\n", fmtClock, msg.User)
-		}
-	}
+	// Prevent program exit before something is sent on this
+	<-systemExitChannel
 }
