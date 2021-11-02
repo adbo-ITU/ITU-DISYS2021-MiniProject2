@@ -1,5 +1,5 @@
 image = disys-miniproject2-group-pointofgoreturn
-run_container = docker run -it --rm -v $(CURDIR):/app --network="host" $(image)
+run_container = docker run -it --rm -v '$(CURDIR):/app' --network="host" $(image)
 
 .PHONY: docker-image
 docker-image:
