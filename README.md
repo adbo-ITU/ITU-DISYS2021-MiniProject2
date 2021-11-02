@@ -15,6 +15,10 @@ To avoid using Docker and just run the program outside of docker, use the non-Do
 
 ## Using the program
 
+Here is a quick demo of the program:
+
+![Video demo of the program](https://i.imgur.com/uXsgGBJ.gif)
+
 ### Server
 
 The server does not need you to do anything other than start it.
