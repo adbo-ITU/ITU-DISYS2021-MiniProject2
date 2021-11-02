@@ -10,6 +10,8 @@ import (
 	"github.com/gizak/termui/v3/widgets"
 )
 
+const MAX_INPUT_LENGTH = 128
+
 type UserUI struct {
 	grid          *ui.Grid
 	chatInput     *widgets.Paragraph
@@ -68,14 +70,20 @@ func (u *UserUI) HandleUIEvents(systemExitChan chan<- bool) {
 				u.userInput = u.userInput[:length-1]
 			}
 		case "<Space>":
-			u.userInput += " "
+			u.addStr(" ")
 		default:
 			if IsLegalCharacter(e.ID) {
-				u.userInput += e.ID
+				u.addStr(e.ID)
 			}
 		}
 
 		u.Render()
+	}
+}
+
+func (u *UserUI) addStr(input string) {
+	if len(u.userInput)+len(input) <= MAX_INPUT_LENGTH {
+		u.userInput += input
 	}
 }
 
