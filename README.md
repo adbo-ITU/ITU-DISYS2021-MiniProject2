@@ -46,3 +46,21 @@ MESSAGE GOES HERE
 You can join with different clients, and you can see that the vector clock and usernames should respond appropriately.
 
 In order to scroll up and down in the messages box, simply use the UP and DOWN arrow keys. You *may* have to click it multiple times before anything happens due to a bug.
+
+## Logs
+
+The server writes its logs to stdout. The client uses the terminal for a GUI, so the logs are written to a file instead - this file is called `client.log`.
+
+The following three subsections show log output for a chat session where two users, *Alpha* and *Bravo*, chat.
+
+### Example server log
+
+TBA.
+
+### Example client log (user "Alpha")
+
+TBA.
+
+### Example client log (user "Bravo")
+
+TBA.
